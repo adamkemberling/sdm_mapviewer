@@ -1,4 +1,4 @@
-# Modules for app
+# Modules for app - fairly sure they aren't used - AAK
 
 leafletDisplay <- function(id, label = "ssp") {
   ns <- NS(id)
@@ -7,6 +7,8 @@ leafletDisplay <- function(id, label = "ssp") {
     verbatimTextOutput(ns("out"))
   )
 }
+
+
 
 counterServer <- function(id) {
   moduleServer(
@@ -24,10 +26,14 @@ counterServer <- function(id) {
   )
 }
 
+
+
 ui <- fluidPage(
   counterButton("counter1", "Counter #1"),
   counterButton("counter2", "Counter #2")
 )
+
+
 
 server <- function(input, output, session) {
   counterServer("counter1")

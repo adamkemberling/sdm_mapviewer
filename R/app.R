@@ -1,9 +1,9 @@
 ####  Species Distribution Forecasting App
 
-# Author: Matt Dzaugis
+# Author: Matt Dzaugis & Adam Kemberling
 # About:
 # Display species distribution shifts as
-# forecasted by VAST models
+# forecaster by VAST models
 
 
 
@@ -13,6 +13,9 @@ library(shiny)
 library(shinydashboard)
 library(leaflet)
 library(gmRi)
+library(zoo)
+library(sf)
+
 
 
 # Support Functions:
@@ -20,6 +23,7 @@ source(here::here("R/app_support_functions.R"))
 
 
 ####  Data Prep  ####
+
 
 # Path to shiny app on Box
 sdmShiny_path <- gmRi::cs_path(box_group = "Mills lab", 
@@ -30,12 +34,24 @@ Res_Data_path <- gmRi::cs_path(box_group = "Res_Data",
                                subfolder = "Shapefiles/ne_50m_land/")
 
 
+# Read the cropped land coverage:
+land_sf <- read_sf("./Data/spatial/nw_atlantic_countries_crs32619.geojson")
+land_wgs <- read_sf("./Data/spatial/nw_atlantic_countries_crs4326.geojson")
 
-####__ Selection Choices  ####
+
+
+#### User Selection Choices  ####
 
 
 # List of the available species
-speciesList <- c("American lobster", "Black sea bass")
+speciesList <- sort(
+  c("American lobster", #"Black sea bass", 
+    "Atlantic cod", 
+    "Atlantic halibut", 
+    "Atlantic herring", 
+    "Haddock", 
+    "Sea scallop", 
+    "Yellowtail flounder"))
 
 
 # List of the available SSP scenarios
@@ -44,216 +60,145 @@ sspList <- c("SSP5 8.5")
 
 
 
-####__ File Loading  ####
+#### File Loading  ####
 
 
-# Cut down on repeated file naming
-fetch_boxdata <- function(data_resource = NULL){
-  
-  # Path to box where Andrew is putting outputs
-  project_path <- gmRi::cs_path("Mills Lab", 
-                                subfolder = "Projects/sdm_workflow/DFOSDM_app")
-  
-  # Folder for the specific resource
-  resource_folder <- str_c(project_path, data_resource)
-  
-  # List the files and name them
-  resource_files <- list.files(resource_folder, full.names = TRUE) %>% 
-    setNames(list.files(resource_folder, full.names = FALSE))
-  
-  # Return the files
-  return(resource_files)
-  
-}
+#### 1. Baseline Data  ####
+
+# # Read in baselines
+# baseline_dataList <- fetch_boxdata("baseline_data") %>% 
+#   map(~data.table::fread(.x, stringsAsFactors = FALSE))
+# 
+# # Baseline Prep
+# baseline_dataList <- map(baseline_dataList, baseline_prep)
 
 
-#### 1. Baseline Data
-
-# Read in baselines
-baseline_dataList <- fetch_boxdata("baseline_data") %>% map(~data.table::fread(.x, stringsAsFactors = FALSE) %>% bSquare(25000*25000))
+# Load Pre-Prepped App Data::
+baseline_datList <- fetch_appdata(data_resource = "baseline_data")
 
 
-#### 2. Projected Data
-dataList <- fetch_boxdata("projected_data") %>% 
-  map(function(x){
-    data.table::fread(x, stringsAsFactors = FALSE) %>% 
-      mutate(year = lubridate::year(Date),
-             mon = lubridate::month(Date),
-             season = case_when(mon == 3 ~ "Spring",
-                                mon == 7 ~ "Summer",
-                                mon == 9 ~ "Fall")) 
-  }) %>% 
-  map(~bSquare(.x, 25000*25000))
 
-# List files in the projected_data folder
-fileNames <- list.files(here::here("projected_data"), full.names = TRUE)
-names(fileNames) <- list.files(here::here("projected_data"), full.names = FALSE)
+#### 2. Projected Data  ####
 
-# Read in data from projected_data folder
-dataList <- imap(fileNames, ~data.table::fread(.x, stringsAsFactors = FALSE))
+# # Read in the SSP projections:
+# dataList <- fetch_boxdata("projected_data") %>% 
+#   map(function(x){data.table::fread(x, stringsAsFactors = FALSE)})
+# 
+# 
+# # Projected Prep
+# dataList <- map(dataList, projection_prep)
 
-# Format the Seasons, apply bSquare transformation
-dataList <- imap(dataList, ~mutate(.x, year = lubridate::year(Date),
-                                       mon = lubridate::month(Date),
-                                       season = case_when(mon == 3 ~ "Spring",
-                                                          mon == 7 ~ "Summer",
-                                                          mon == 9 ~ "Fall")))
 
-dataList <- map(dataList, ~bSquare(.x, 25000*25000))
+# Load Pre-Prepped App Data::
+dataList <- fetch_appdata(data_resource = "spatial_summary")
 
 
 
 
-#### 3. Spatial Summaries
+#### 3. Annual Spatial Summaries  ####
 
-
-# List files in annual summary data from spatial_summary folder
-annual_fileNames <- list.files(here::here("spatial_summary"), full.names = TRUE)
-names(annual_fileNames) <- list.files(here::here("spatial_summary"), full.names = FALSE)
-
-# Read in data from spatial_summary folder
-annual_dataList <- imap(annual_fileNames, ~data.table::fread(.x, stringsAsFactors = FALSE))
-annual_dataList <- imap(annual_dataList, ~mutate(.x, meanBio = mean,
-                                                 totalBio = sum,
-                                                 std = sd))
+# # Read in the Spatial Summaries:
+# annual_dataList <- fetch_boxdata("spatial_summary") %>% 
+#   map(~ data.table::fread(.x, stringsAsFactors = FALSE)) 
+# 
+# 
+# # Annual Summary prep
+# annual_dataList <- map(annual_dataList, spat_summ_prep)
 
 
 
+# Load Pre-Prepped App Data::
+annual_dataList <- fetch_appdata(data_resource = "spatial_summary")
 
-####  4. Annual Summaries  ####
 
-# List files in annual summary data from spatial_summary folder
-center_fileNames <- list.files(here::here("center_biomass"), full.names = TRUE)
-names(center_fileNames) <- list.files(here::here("center_biomass"), full.names = FALSE)
+####  4.  Summaries  
 
-# Read in data from center_biomass folder
-center_dataList <- imap(center_fileNames, ~data.table::fread(.x, stringsAsFactors = FALSE))
+# # Center of biomass data
+# center_dataList <- fetch_boxdata("center_biomass") %>% 
+#   map(~data.table::fread(.x, stringsAsFactors = FALSE))
 
-# Getting land mask
-bbox <- c(xmin = -78.5, ymin = 34.5, xmax = -54.5, ymax = 48.25)
-land_sf<- sf::st_read(paste0(Res_Data_path, "ne_50m_land.shp")) %>% 
-  sf::st_crop(bbox)
-land_sf<- sf::st_transform(land_sf, crs = 32619)
 
-# SDM plotting function
-sdmPlotFun <- function(dataInput, land_sf, plot_lims, mapTitle){
-  ggplot(dataInput()) + 
-    geom_sf(aes(fill=Log_Biomass, color=Log_Biomass, geometry=geometry)) +
-    scale_fill_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent", limits = plot_lims()) +
-    scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent", limits = plot_lims()) +
-    geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-    coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
-    labs(title = mapTitle()) +
-    theme_map()
-}
+# Load Pre-Prepped App Data::
+center_dataList <- fetch_appdata(data_resource = "center_biomass")
 
-# Annual_summary plotting function
-annualPlotFun <- function(dataInput, plot_title){
-  
-  spat_summ_df <- dataInput()
-  
-  plot_regions <- unique(spat_summ_df$Region)
-  
-  color_pal <- c('#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02')
-  colors_use <- color_pal[1:length(plot_regions)]
-  
-  # Date stuffs
-  date_col_class<- class(spat_summ_df$Date)
-  if(is.character(date_col_class)){
-    spat_summ_df$Date<- as.Date(spat_summ_df$Date)
-  }
-  date_breaks<- seq.Date(from = as.Date(min(spat_summ_df$Date)), to = as.Date(max(spat_summ_df$Date)), by = "5 years")
-  
-  plot_out <- ggplot() +
-    geom_point(data = spat_summ_df, aes_string(x = "Date", y = "meanBio", color = "Region")) +
-    geom_line(data = spat_summ_df, aes_string(x = "Date", y = "meanBio", color = "Region")) +
-    scale_color_manual(values = colors_use) +
-    scale_x_date(breaks = date_breaks, date_labels = "%Y") +
-    xlab("Year") +
-    ylab("Mean log biomass (kg)") +
-    ggtitle(plot_title()) + 
-    theme_bw() +
-    theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) 
-  
-  return(plot_out)
-  
-}
 
-# Center of Biomass plotting function
-centerBioPlotFun <- function(dataInput, plot_title){
-  plot_out <- dataInput() %>% 
-    ggplot() +
-    geom_line(aes(year, latitude)) +
-    xlab("Year") +
-    ylab("Center of Biomass (latitude)") +
-    ggtitle(plot_title()) + 
-    theme_bw() +
-    theme(legend.title = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) 
-  
-  return(plot_out)
-  
-}
+####________####
+#### Shiny UI modules  ####
 
-# Plotting map theme
-theme_map <- function(x){
-  theme(panel.background = element_blank(), 
-       panel.border = element_blank(), 
-       axis.text.x=element_blank(), 
-       axis.text.y=element_blank(), 
-       axis.ticks=element_blank(),  
-       plot.margin = margin(t = 10, r = 0.05, b = 0.05, l = 0.05, unit = "pt"),
-       legend.position = c(.85, .25))}
-
-## Shiny UI modules
-
-# sidebar user inputs
+# Sidebar user selection inputs
 sideUI <- function(id) {
   ns <- NS(id)
   tagList(
+    
+    # Select Species
     selectInput(
       inputId = ns("species"),
       label = "Species name", 
       choices = unique(speciesList),
       selected = unique(speciesList)[1]
     ),
+    
+    # Select CMIP SSP Scenario
     selectInput(
       inputId = ns("ssp"),
       label = "SSP scenario", 
       choices = unique(sspList),
       selected = unique(sspList)[1]
     ),
+    
+    # Select the sruvey season
     selectInput(
       inputId = ns("season"),
       label = "Season", 
       choices = c("Spring", "Summer", "Fall"),
       selected = "Spring"
     ),
+    # sliderInput(
+    #   inputId = ns("year"),
+    #   label = "Year", 
+    #   value = 2020,
+    #   min=1985,
+    #   max=2100,
+    #   sep=""
+    # )
     sliderInput(
-      inputId = ns("year"),
-      label = "Year", 
+      inputId = ns("decade"),
+      label = "Decade", 
       value = 2020,
-      min=1985,
-      max=2100,
-      sep=""
+      min = 2020,
+      max = 2090, 
+      step = 10,
+      sep="", 
+      post = "'s"
     )
+    
   )
   
 }
 
-# map output
+# Map output(s)
 mapUI <- function(id) {
   ns <- NS(id)
   tagList(plotOutput(ns("plot")))
 }
 
-# download button output
+
+# Download button output
 downloadUI <- function(id) {
   ns <- NS(id)
   tagList(downloadButton(ns('downloadPlot'), 'Download Plot'),
           downloadButton(ns('downloadData'), 'Download Data'))
 }
 
-## Shiny server modules
+
+
+####________####
+#### Shiny server modules  ####
+
+# Testing the input  filters:
+# input <- list("species" = "American lobster", "ssp" = "SSP5 8.5", "decade" = 2020, season = "Spring")
+
+
 
 # Filter the data list based on species and ssp
 sideFilter <- function(id, datalist, baseline = FALSE){
@@ -261,18 +206,30 @@ sideFilter <- function(id, datalist, baseline = FALSE){
     id,
     function(input, output, session){
       
+       # Get dataset based on user inputs:
+       # subsets from dataList or baseline_dataList
        df <- reactive({
-        name_ <- str_replace_all(input$species, "[:space:]", "_")
-        ssp_ <- str_replace_all(input$ssp, c("[:space:]" = "_", "\\." = ""))
         
+         # adjust input string from species
+         name_ <- str_replace_all(input$species, "[:space:]", "_")
+         
+         # Adjust string input from ssp
+         ssp_ <- str_replace_all(input$ssp, c("[:space:]" = "_", "\\." = ""))
+         ssp_ <- str_c("ST_", ssp_)
+        
+        # Toggle for Baseline Data
         if(isTRUE(baseline)){
           dfName <- str_subset(names(datalist), paste(name_, sep="_"))
         }
         
+        
+        # Toggle for Projections
         if(isFALSE(baseline)){
           dfName <- str_subset(names(datalist), paste(name_, ssp_, sep="_"))
         }
         
+        
+        # Pull Projection from dataList (or baseline_dataList)
         df <- datalist[[dfName]]
         
         return(df)
@@ -281,16 +238,38 @@ sideFilter <- function(id, datalist, baseline = FALSE){
   )
 }
 
-# Filter selected species and ssp by year and season
+
+
+# Testing dataList and baseline_dataList Filtering:
+
+# name_test <- str_replace_all(input$species, "[:space:]", "_")
+# ssp_test <- str_replace_all(input$ssp, c("[:space:]" = "5_", "\\." = ""))
+# ssp_test <- str_c("ST_", ssp_test)
+
+# baseline name matching:
+# str_subset(names(baseline_dataList),  paste(name_test, sep="_")) 
+
+# projection list name matching:
+# str_subset(names(dataList), paste(name_test, ssp_test, sep="_"))
+# dfName <- str_subset(names(dataList), paste(name_test, ssp_test, sep="_"))
+
+
+
+
+# Filter projection data by selected species, ssp by decade and season
 sideServer <- function(id, df) {
   moduleServer(
     id,
     function(input, output, session) {
       
+      # Take projection data and subset by user selections
       df_r <- reactive({
         
-        df <- df() %>% dplyr::filter(year == input$year,
-                              season == input$season)
+        df <- df() %>% 
+          dplyr::filter(
+            #year == input$year,
+            Decade == input$decade,                           
+            Season == input$season)
 
         return(df)
       })
@@ -298,40 +277,65 @@ sideServer <- function(id, df) {
     })
 }
 
-# Create the plot limits
+
+# Testing the filters of sideServer:
+
+# df <- dataList[[dfName]]
+# df %>% filter(Decade == input$decade, Season == input$season)
+
+
+
+
+# Create the dynamic plot limits - unnecessary 
 plot_limsServer <- function(id, df){
   moduleServer(
     id,
     function(input, output, session) {
       
       plotLims <- reactive({
-        plotlims <- c(min(tibble(df())[, "Log_Biomass"], na.rm = TRUE), max(tibble(df())[, "Log_Biomass"], na.rm = TRUE))
+        plotlims <- c(0,
+                      #min(tibble(df())[, "Log_Biomass"], na.rm = TRUE), 
+                      max(tibble(df())[, "Log_Biomass"], na.rm = TRUE))
       })
       return(plotLims)
     })
 }
 
-# Create map name
+
+
+# Testing pllotLims
+# min(tibble(df)[, "Log_Biomass"], na.rm = TRUE)
+# max(tibble(df)[, "Log_Biomass"], na.rm = TRUE)
+
+
+
+# Create map names/titles
 mapName <- function(id, plotType){
   moduleServer(
     id,
+    
     function(input, output, session){
       mapName <- reactive({
         
+        # Baseline Plot Title
         if(plotType == "baseline"){
-          titleName <- paste(input$species, "baseline log biomass", sep = " ")
+          titleName <- paste(input$species, "Baseline Period 2015-2019: log(Biomass)", sep = " | ")
         }
         
         if(plotType == "sdmPlot"){
-          titleName <- paste(input$species, input$ssp, input$season, input$year, sep = " ")
+          titleName <- paste(input$species, " | ", input$ssp, " Projected Biomass: ", input$season, " ", input$decade, "'s", sep = "")
         }
         
         if(plotType == "difference"){
-          titleName <- paste(input$species, "difference in log biomass", sep = " ")
+          titleName <- paste(input$species, " | Baseline Change to the ", input$decade, "'s",sep = "")
         }
         
         if(plotType == "annualPlot"){
-          titleName <- paste(input$species, input$ssp, "annual", sep = " ")
+          titleName <- paste(input$species, "|", input$ssp, "Projected Annual Biomass", sep = " ")
+        }
+        
+        if(plotType == "centerPlot"){
+          titleName <- paste(input$species, "|", input$ssp, "Projected Center of Biomass", sep = " ")
         }
         
         return(titleName)
@@ -340,26 +344,29 @@ mapName <- function(id, plotType){
   )
 }
 
+
 # SDM draw plot
-mapServer <- function(id, dataInput, land_sf, plot_lims, mapTitle) {
+mapServer <- function(id, dataInput, land_sf, plot_lims, mapTitle, diff_limits = FALSE) {
   moduleServer(
     id,
     function(input, output, session) {
       output$plot <- renderPlot({
         
-        sdmPlotFun(dataInput, land_sf, plot_lims, mapTitle)
+        sdmPlotFun(dataInput, land_sf, plot_lims, mapTitle, diff_limits)
         
       })
     })
 }
 
-# Differencing Server
+
+# Difference Data Server Calculation
 differenceServer <- function(id, baselineInput, projectionInput, mapTitle){
   moduleServer(
     id,
     function(input, output, session){
       df_r <- reactive({
-        df <- sf::st_join(baselineInput(), projectionInput(), by = c("x", "y", "Species", "geometry")) %>% 
+        df <- sf::st_join(baselineInput(), projectionInput(), # don't think by is relevant for these...
+                          by = c("Lon", "Lat", "Species", "Season", "Climate_Scenario", "geometry")) %>% 
           mutate(Log_Biomass = Log_Biomass.y - Log_Biomass.x,
                  Biomass = Biomass.y - Biomass.x) %>% 
           dplyr::select(-Log_Biomass.x, -Log_Biomass.y, -Biomass.x, -Biomass.y)
@@ -386,7 +393,7 @@ tsPlotServer <- function(id, dataInput, plotType, plotTitle){
 
       if(plotType == "centerPlot"){
         output$plot <- renderPlot({
-          centerBioPlotFun(dataInput = dataInput, plot_title = plotTitle)
+          centerBioPlotFun(dataInput = dataInput, plot_title = plotTitle, land_wgs = land_wgs)
         })
       }
       
@@ -395,26 +402,26 @@ tsPlotServer <- function(id, dataInput, plotType, plotTitle){
 }
 
 # draw and download plot
-downloadServer <- function(id, plotType, dataInput, land_sf, plot_lims, mapTitle){
+downloadServer <- function(id, plotType, dataInput, land_sf, plot_lims, mapTitle, diff_limits = FALSE){
   moduleServer(
     id,
     function(input, output, session){
       
       if(plotType == "sdmPlot"){
         plot1 <- reactive({
-          sdmPlotFun(dataInput, land_sf, plot_lims, mapTitle)
+          sdmPlotFun(dataInput, land_sf, plot_lims, mapTitle, diff_limits)
         })
       }
       
       if(plotType == "annualPlot"){
         plot1 <- reactive({
-          annualPlotFun(dataInput = dataInput)
+          annualPlotFun(dataInput = dataInput, plot_title = mapTitle)
         })
       }
       
       if(plotType == "centerPlot"){
         plot1 <- reactive({
-          centerBioPlotFun(dataInput = dataInput)
+          centerBioPlotFun(dataInput = dataInput, plot_title = mapTitle, land_wgs = land_wgs)
         })
       }
       
@@ -437,96 +444,194 @@ downloadServer <- function(id, plotType, dataInput, land_sf, plot_lims, mapTitle
 
 
 
+####________####
+####  User Interface  ####
+
 
 # Build ui & server and then run
 ui <- dashboardPage(
-  dashboardHeader(title = "Marine species distribution under CMIP6",
+  
+  ####_  Header  ####
+  dashboardHeader(title = "Mapping Marine Species Distribution Under CMIP6",
                   titleWidth = 500),
+  
+  
+  ####_  Sidebar  ####
   dashboardSidebar(h3("Project Information"), # make a new tab with project information
                    h3("Selection Panel"),
                    sideUI("side1")),
+  
+  
+  
+  ####_  Dashboard Body  ####
   dashboardBody(
+    
+    
+    # First Row three Panels: Baseline, Projection, Difference
     fluidRow(
-             box(width = 4,
-               title = "Baseline SDM Map",
-               status = "success",
-               solidHeader = TRUE,
-               collapsible = TRUE,
-               mapUI("baseline"),
-               downloadUI("baseline")),
-             box(width = 4,
-               title = "Projected SDM Map",
-               status = "warning",
-               solidHeader = TRUE,
-               collapsible = TRUE,
-               mapUI("map1"),
-               downloadUI("map1")
-               ),
-             box(width = 4,
-                 title = "Difference in biomass",
-                 status = "danger",
-                 solidHeader = TRUE,
-                 collapsible = TRUE,
-                 mapUI("difference"),
-                 downloadUI("difference")
-             )
-             ),
+      
+      
+      # Baseline Period Map
+      box(width = 4,
+          title = "Baseline Species Distribution",
+          status = "success",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          mapUI("baseline"),
+          downloadUI("baseline")),
+             
+      # SSP Seasonal Projection
+      box(width = 4,
+          title = "Projected Species Distribution",
+          status = "warning",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          mapUI("map1"),
+          downloadUI("map1")),
+      
+      # Difference in Biomass
+      box(width = 4,
+          title = "Forecasted Change in Biomass",
+          status = "danger",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          mapUI("difference"),
+          downloadUI("difference"))),
+    
+    
+    # Second Row 2 Panels: Annual Biomass
     fluidRow(
+      
+      # Annual Biomass Summary
       box(width = 6,
-          title = "Annual Summary",
+          title = "Annual Biomass Summary",
           status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
           mapUI("annualPlot1"),
-          downloadUI("annualPlot1")
-          ),
+          downloadUI("annualPlot1")),
+      
+      # Center of Biomass Summary
       box(width = 6,
-          title = "Center of Biomass",
+          title = "Projected Center of Biomass",
           status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
           mapUI("centerPlot"),
-          downloadUI("centerPlot")
-          )
-    )
-    )
-  )
+          downloadUI("centerPlot"))
+    
+      ) # Close Second fluidRow
+    
+    ) # Close DashboardBody
+  
+  ) # Close DashboardPage
+
+
+
+
+####________####
+####  Server Interface  ####
 
 server <- function(input, output, session) {
 
-# Projected Map
-  # sdm plot
+  ####_  Projected Map  ####
+  
+  # sdm plot - Projection Data
+  
+  # Filter the data, use dataList
   df1 <- sideFilter("side1", datalist = dataList)
+  
+  # Get plot limits for color scale
   plotLims1 <- plot_limsServer("side1", df1)
+  
+  # build map title
   mapTitle1 <- mapName("side1", plotType = "sdmPlot")
-  data_input1 <- sideServer("side1", df1) # season year data
-  mapServer("map1", dataInput = data_input1, land_sf = land_sf, plot_lims = plotLims1, mapTitle = mapTitle1)
-  downloadServer("map1", plotType = "sdmPlot", dataInput = data_input1, land_sf = land_sf, plot_lims = plotLims1, mapTitle = mapTitle1)
+  
+  # Pull the data 
+  data_input1 <- sideServer("side1", df1) # season year/decade data
+  mapServer("map1", 
+            dataInput = data_input1, 
+            land_sf = land_sf, 
+            plot_lims = plotLims1, 
+            mapTitle = mapTitle1,
+            diff_limits = FALSE)
+  downloadServer("map1", 
+                 plotType = "sdmPlot", 
+                 dataInput = data_input1, 
+                 land_sf = land_sf, 
+                 plot_lims = plotLims1, 
+                 mapTitle = mapTitle1,
+                 diff_limits = FALSE)
 
-# Baseline Map
+  
+  ####_ Baseline Map  ####
   baselineDF <- sideFilter("side1", datalist = baseline_dataList, baseline = TRUE)
   baseline_mapTitle <- mapName("side1", plotType = "baseline")  
-  mapServer("baseline", dataInput = baselineDF, land_sf = land_sf, plot_lims = plotLims1, mapTitle = baseline_mapTitle)
-  downloadServer("baseline", plotType = "sdmPlot", dataInput = data_input1, land_sf = land_sf, plot_lims = plotLims1, mapTitle = baseline_mapTitle)
+  mapServer("baseline", 
+            dataInput = baselineDF, 
+            land_sf = land_sf, 
+            plot_lims = plotLims1, 
+            mapTitle = baseline_mapTitle,
+            diff_limits = FALSE)
+  downloadServer("baseline", 
+                 plotType = "sdmPlot", 
+                 dataInput = data_input1, 
+                 land_sf = land_sf, 
+                 plot_lims = plotLims1, 
+                 mapTitle = baseline_mapTitle,
+                 diff_limits = FALSE)
   
-# Difference Map  
+  
+  ####_ Difference Map    ####
   diff_mapTitle <- mapName("side1", plotType = "difference") 
   diffDF <- differenceServer("side1", baselineInput = baselineDF, projectionInput = data_input1, mapTitle = differenceTitle)
   plotLims2 <- plot_limsServer("side1", diffDF)
-  mapServer("difference", dataInput = diffDF, land_sf = land_sf, plot_lims = plotLims2, mapTitle = diff_mapTitle)
-  downloadServer("difference", plotType = "sdmPlot", dataInput = diffDF, land_sf = land_sf, plot_lims = plotLims2, mapTitle = diff_mapTitle)
+  mapServer("difference", 
+            dataInput = diffDF, 
+            land_sf = land_sf, 
+            plot_lims = plotLims2, 
+            mapTitle = diff_mapTitle,
+            diff_limits = TRUE)
+  downloadServer("difference", 
+                 plotType = "sdmPlot", 
+                 dataInput = diffDF, 
+                 land_sf = land_sf, 
+                 plot_lims = plotLims2, 
+                 mapTitle = diff_mapTitle,
+                 diff_limits = TRUE)
   
-# annual plot
+  
+  ####_ Annual plot  ####
   annual_df1 <- sideFilter("side1", datalist = annual_dataList, baseline = FALSE)
-  ann_mapTitle1 <- mapName("side1", plotType = "annualPlot")
-  tsPlotServer("annualPlot1", dataInput = annual_df1, plotType = "annualPlot", plotTitle = ann_mapTitle1)
-  downloadServer("annualPlot1", plotType = "annualPlot", dataInput = annual_df1, land_sf = land_sf, plot_lims = plotLims1, mapTitle = ann_mapTitle1)
+  # Add filtering for the season? : Something like this:
+  # ann_seas_DF <- annualServer("side1",  datalist = baseline_dataList, projectionInput = data_input1)
   
-# Center of Biomass
+  ann_mapTitle1 <- mapName("side1", plotType = "annualPlot")
+  tsPlotServer("annualPlot1", 
+               dataInput = annual_df1, 
+               plotType = "annualPlot", 
+               plotTitle = ann_mapTitle1)
+  downloadServer("annualPlot1", 
+                 plotType = "annualPlot", 
+                 dataInput = annual_df1, 
+                 land_sf = land_sf, 
+                 plot_lims = plotLims1, 
+                 mapTitle = ann_mapTitle1)
+  
+  
+  ####_ Center of Biomass  ####
   center_df1 <- sideFilter("side1", datalist = center_dataList, baseline = FALSE)
-  center_mapTitle1 <- mapName("side1", plotType = "annualPlot")
-  tsPlotServer("centerPlot", dataInput = center_df1, plotType = "centerPlot", plotTitle = center_mapTitle1)
-  downloadServer("centerPlot", plotType = "centerPlot", dataInput = center_df1, land_sf = land_sf, plot_lims = plotLims1, mapTitle = center_mapTitle1)
+  center_mapTitle1 <- mapName("side1", plotType = "centerPlot")
+  tsPlotServer("centerPlot", 
+               dataInput = center_df1, 
+               plotType = "centerPlot", 
+               plotTitle = center_mapTitle1)
+  downloadServer("centerPlot", 
+                 plotType = "centerPlot", 
+                 dataInput = center_df1, 
+                 land_sf = land_sf, 
+                 plot_lims = plotLims1, 
+                 mapTitle = center_mapTitle1)
 
 }
 
