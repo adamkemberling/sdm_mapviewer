@@ -367,70 +367,70 @@ iwalk(center_dataList, export_app_data, folder = "center_biomass", fextension = 
 
 
 
-# Plotting Lat/Lon data
-
-# pull a table that is in lat/lon
-decdeg_dat <- baseline_dataList$American_lobster_SSP585_mean_baseline.csv
-base_sf <- st_as_sf(decdeg_dat, coords = c("Lon", "Lat"), crs = 4326, remove = FALSE) 
-
-ggplot(base_sf) + 
-  geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
-  scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + #, limits = plot_lims()) +
-  geom_sf(data = st_transform(land_sf, crs = 4326), fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-  coord_sf(xlim = c(-76, -56), ylim = c(35.5, 47.5), expand = FALSE, crs = 4326) +
-  labs(title = "Baseline",) +
-  theme_map()
-
-
-# Plotting in projected coords as sf:
-base_sf %>% st_transform(crs = 32619) %>% 
-  ggplot() + 
-  geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
-  scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + #, limits = plot_lims()) +
-  geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-  coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
-  labs(title = "Baseline",) +
-  theme_map()
-
-
-
-
-# Working to tile from lat/lon in degrees:
-base_sf %>% st_transform(crs = 32619) %>% 
-  mutate(x = sf::st_coordinates(.)[,1],
-         y = sf::st_coordinates(.)[,2]) %>% 
-  #bind_cols(base_sf) %>% 
-  ggplot() +
-  geom_tile(aes(x, y, fill = Log_Biomass), color = "transparent" ,  width = 25000, height = 25000) +
-  scale_fill_viridis_c(option = "viridis", na.value = "transparent") + 
-  geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-  coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
-  labs(title = "Baseline - geom_tile", fill = "Log( Biomass )") +
-  theme_map()
-
-
-
-
-
-
-
-#Loading UTM geojson
-utm_test <- baseline_sfList$American_lobster_SSP85_mean_baseline_utm.geojson
-ggplot(utm_test) +
-  geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
-  scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + 
-  geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-  coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
-  labs(title = "Baseline",) +
-  theme_map()
-
-
-#Loading UTM geojson
-wgs_test <- baseline_sfList$American_lobster_SSP85_mean_baseline_wgs.geojson
-ggplot(wgs_test) +
-  geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
-  scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + 
-  geom_sf(data = st_transform(land_sf, crs = 4326), fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
-  coord_sf(xlim = c(-76, -56), ylim = c(35.5, 47.5), expand = FALSE, crs = 4326) +
-  labs(title = "Baseline") +
-  theme_map()
+# # Plotting Lat/Lon data
+# 
+# # pull a table that is in lat/lon
+# decdeg_dat <- baseline_dataList$American_lobster_SSP585_mean_baseline.csv
+# base_sf <- st_as_sf(decdeg_dat, coords = c("Lon", "Lat"), crs = 4326, remove = FALSE) 
+# 
+# ggplot(base_sf) + 
+#   geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
+#   scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + #, limits = plot_lims()) +
+#   geom_sf(data = st_transform(land_sf, crs = 4326), fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
+#   coord_sf(xlim = c(-76, -56), ylim = c(35.5, 47.5), expand = FALSE, crs = 4326) +
+#   labs(title = "Baseline",) +
+#   theme_map()
+# 
+# 
+# # Plotting in projected coords as sf:
+# base_sf %>% st_transform(crs = 32619) %>% 
+#   ggplot() + 
+#   geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
+#   scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + #, limits = plot_lims()) +
+#   geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
+#   coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
+#   labs(title = "Baseline",) +
+#   theme_map()
+# 
+# 
+# 
+# 
+# # Working to tile from lat/lon in degrees:
+# base_sf %>% st_transform(crs = 32619) %>% 
+#   mutate(x = sf::st_coordinates(.)[,1],
+#          y = sf::st_coordinates(.)[,2]) %>% 
+#   #bind_cols(base_sf) %>% 
+#   ggplot() +
+#   geom_tile(aes(x, y, fill = Log_Biomass), color = "transparent" ,  width = 25000, height = 25000) +
+#   scale_fill_viridis_c(option = "viridis", na.value = "transparent") + 
+#   geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
+#   coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
+#   labs(title = "Baseline - geom_tile", fill = "Log( Biomass )") +
+#   theme_map()
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# #Loading UTM geojson
+# utm_test <- baseline_sfList$American_lobster_SSP85_mean_baseline_utm.geojson
+# ggplot(utm_test) +
+#   geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
+#   scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + 
+#   geom_sf(data = land_sf, fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
+#   coord_sf(xlim = c(-165000, 1585000), ylim = c(3865000, 5385000), expand = FALSE, crs = 32619) +
+#   labs(title = "Baseline",) +
+#   theme_map()
+# 
+# 
+# #Loading UTM geojson
+# wgs_test <- baseline_sfList$American_lobster_SSP85_mean_baseline_wgs.geojson
+# ggplot(wgs_test) +
+#   geom_sf(aes(color=Log_Biomass, geometry=geometry), fill = "transparent", shape = 15) +
+#   scale_color_viridis_c(name = "Log_Biomass", option = "viridis", na.value = "transparent") + 
+#   geom_sf(data = st_transform(land_sf, crs = 4326), fill = "#d9d9d9", lwd = 0.2, na.rm = TRUE) +
+#   coord_sf(xlim = c(-76, -56), ylim = c(35.5, 47.5), expand = FALSE, crs = 4326) +
+#   labs(title = "Baseline") +
+#   theme_map()

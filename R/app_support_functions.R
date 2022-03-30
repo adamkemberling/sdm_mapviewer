@@ -9,18 +9,27 @@
 theme_map <- function(...){
   list(
     # Theme options, with ellipse to add more
-    theme(panel.background = element_blank(), 
-          panel.border = element_rect(color = "black", fill = "transparent"), 
-          panel.grid.major = element_line(color = "gray80"),
-          #axis.text.x=element_blank(), 
-          #axis.text.y=element_blank(), 
-          axis.title.x = element_blank(),
-          axis.title.y = element_blank(),
-          axis.ticks=element_blank(),
-          plot.margin = margin(t = 10, r = 2, b = 0.1, l = 2, unit = "pt"),
-          legend.position = c(.725, .125), 
-          legend.background = element_rect(color = "transparent", fill = "white", 
-                                           size = 0.25),
+    theme(
+      
+      # Titles
+      plot.title = element_text(hjust = 0, face = "bold", size = 14),
+      plot.subtitle = element_text(size = 9),
+      legend.title = element_text(size = 9),
+      legend.text = element_text(size = 9),
+      
+      # Grids and Axes
+      panel.background = element_blank(), 
+      panel.border = element_rect(color = "black", fill = "transparent"), 
+      panel.grid.major = element_line(color = "gray80"),
+      #axis.text.x=element_blank(), 
+      #axis.text.y=element_blank(), 
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks=element_blank(),
+      plot.margin = margin(t = 10, r = 2, b = 0.1, l = 2, unit = "pt"),
+      legend.position = c(.725, .125), 
+      legend.background = element_rect(color = "transparent", fill = "white", 
+                                       size = 0.25),
           
           # Use ellipses for tweaks on the fly:
           ...),
@@ -53,6 +62,12 @@ theme_map <- function(...){
 theme_plot <- function(...){
   list(
     theme(
+      # Titles
+      plot.title = element_text(hjust = 0, face = "bold", size = 14),
+      plot.subtitle = element_text(size = 9),
+      legend.title = element_text(size = 9),
+      legend.text = element_text(size = 9),
+      
       # Axes
       rect = element_rect(fill = "transparent", color = "black"),
       axis.line.y = element_line(color = "black"),
@@ -75,7 +90,11 @@ theme_plot <- function(...){
         color = "#00736D", 
         fill = "#00736D", 
         size = 1, 
-        linetype="solid"))
+        linetype="solid"),
+      # Legend
+      legend.position = "bottom"
+      
+      ) # close theme()
     
   )
   
@@ -125,16 +144,26 @@ fetch_boxdata <- function(data_resource = NULL){
 
 # Baseline data prep:
 baseline_prep <- function(baseline_dat){
-  baseline_dat %>% 
+  baseline_prepped <- baseline_dat %>% 
     mutate(Season = factor(Season, levels = c("Spring", "Summer","Fall"))) %>% 
-    bSquare(25000*25000, coords = c("Lon", "Lat"))
+    bSquare(25000*25000, coords = c("Lon", "Lat")) # 
+  
+  # Drop columns we don't need
+  baseline_prepped <- baseline_prepped%>% 
+    select(Lon, Lat, Season, Climate_Scenario, Species, Log_Biomass, geometry)
 }
 
 # Projected Data prep:
 projection_prep <- function(proj_dat){
-  proj_dat %>% 
+  proj_prepped <- proj_dat %>% 
     mutate(Season = factor(Season, levels = c("Spring", "Summer","Fall"))) %>% # Do bSquare
-    bSquare(25000*25000, coords = c("Lon", "Lat"))
+    bSquare(25000*25000, coords = c("Lon", "Lat")) 
+  
+  # Drop columns we don't need
+  proj_prepped <- proj_prepped  %>% 
+    select(Lon, Lat, Season, Climate_Scenario, Species, Log_Biomass, geometry)
+  
+  return(proj_prepped)
 }
 
 
@@ -166,8 +195,13 @@ spat_summ_prep <- function(spat_summ_df){
                                     width = 5, 
                                     FUN = mean,
                                     align = 'center',
-                                    fill=NA))
-    })
+                                    fill=NA)) 
+      }) 
+  
+  
+  # Drop columns we don't need
+  spat_summ_avgs <- spat_summ_avgs %>% 
+    select(Year, Log_Biomass, Region, Season, mean_5yr)
   
   # Return the data with rolling averages
   return(spat_summ_avgs)
@@ -220,7 +254,8 @@ export_app_data <- function(df, fname, folder, fextension = ".geojson", write = 
 fetch_appdata <- function(data_resource = NULL){
   
   # Path to box where Andrew is putting outputs
-  project_path <- "./Data"
+  #project_path <- "./Data"
+  project_path <- here::here("Data")
   
   # Folder for the specific resource
   resource_folder <- str_c(project_path, data_resource, sep = "/")
@@ -267,7 +302,7 @@ fetch_appdata <- function(data_resource = NULL){
 
 
 ####__  SDM Output Maps  
-sdmPlotFun <- function(dataInput, land_sf, plot_lims, mapTitle, diff_limits = FALSE){
+sdmPlotFun <- function(dataInput, land_sf, hague_sf, plot_lims, mapTitle, diff_limits = FALSE){
 
   # Map the sdm outputs:  
   sdm_map <- ggplot() +
@@ -297,6 +332,7 @@ sdmPlotFun <- function(dataInput, land_sf, plot_lims, mapTitle, diff_limits = FA
   
   # finish plot
   sdm_map <- sdm_map +
+    geom_sf(data = hague_sf, color = "black", size = 1) +
     coord_sf(xlim = c(-182500, 1550000), ylim = c(3875000, 5370000), expand = F, crs = 32619) +
     theme_map()
   
@@ -348,20 +384,23 @@ annualPlotFun <- function(dataInput, plot_title){
 
 
 # Center of Biomass plotting function
-centerBioPlotFun <- function(dataInput, plot_title, land_wgs){
+centerBioPlotFun <- function(dataInput, plot_title, land_wgs, hague_sf){
   
+    # rename for convenience
+    center_bio <- dataInput()
   
-    
-    cog_dat <- dataInput()  %>% 
+    # MAke COG data into sf obj
+    cog_dat <- center_bio  %>% 
       st_as_sf(coords = c("Lon", "Lat"), crs = 4326, remove = FALSE)
       
       
     plot_out <- ggplot() +
       geom_sf(data = cog_dat, aes(alpha = Year)) +
       geom_sf(data = land_wgs, fill = "gray50", color = "white", size = 0.15) +
+      geom_sf(data = hague_sf, color = "#EA4F12", size = 1) +
       scale_alpha_continuous(trans = "reverse") +
-      #coord_sf(xlim = c(-76.75, -56), ylim = c(35.5, 47.5), expand = FALSE, crs = 4326) +
-      coord_sf(xlim = c(-182500, 1550000), ylim = c(3875000, 5370000), expand = F, crs = 32619) +
+      coord_sf(xlim = range(center_bio$Lon)+ c(-2,2), ylim = range(center_bio$Lat) + c(-1,1), expand = T, crs = 4326) +
+      # coord_sf(xlim = c(-182500, 1550000), ylim = c(3875000, 5370000), expand = F, crs = 32619) +
       theme_map() +
       labs(title = plot_title(), alpha = "Decade") +
       guides(
