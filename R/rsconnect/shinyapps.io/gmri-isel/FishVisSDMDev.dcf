@@ -1,0 +1,13 @@
+name: FishVisSDMDev
+title: FishVisSDMDev
+username:
+account: gmri-isel
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5974870
+bundleId: 5746745
+url: https://gmri-isel.shinyapps.io/FishVisSDMDev/
+when: 1648670233.04998
+lastSyncTime: 1648670233.05
+asMultiple: FALSE
+asStatic: FALSE

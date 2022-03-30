@@ -11,9 +11,9 @@
 library(tidyverse)
 library(shiny)
 library(shinydashboard)
-library(leaflet)
-library(gmRi)
-library(zoo)
+#library(leaflet)
+library(here)
+#library(zoo)
 library(sf)
 library(shinyWidgets)
 library(shinyalert)
@@ -28,18 +28,8 @@ source(here::here("R/app_support_functions.R"))
 ####  Data Prep  ####
 
 
-# Path to shiny app on Box
-sdmShiny_path <- gmRi::cs_path(box_group = "Mills lab", 
-                               subfolder = "Projects/sdm_workflow/targets_output/shiny")
-
-# Path to Res_Data folder on Box
-Res_Data_path <- gmRi::cs_path(box_group = "Res_Data",
-                               subfolder = "Shapefiles/ne_50m_land/")
-
 
 # # Read the cropped land coverage:
-# land_sf <- read_sf("./Data/spatial/nw_atlantic_countries_crs32619.geojson")
-# land_wgs <- read_sf("./Data/spatial/nw_atlantic_countries_crs4326.geojson")
 
 # Read the cropped land coverage:
 land_sf <- read_sf(here::here("./Data/spatial/nw_atlantic_countries_crs32619.geojson"))
@@ -470,8 +460,9 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       id = "nav",
-      style = "white-space: normal;", # make the text in sidebar not flow into body
-      
+      # make the text in sidebar not flow into body
+      # Fix padding for text
+      style = "white-space: normal; ",
       # Display Controls
       menuItem(
         "Display Options", 
@@ -481,8 +472,14 @@ ui <- dashboardPage(
       
       conditionalPanel(
         condition = "input.nav === 'Displays'",
-        style = "overflow-wrap: anywhere;",
+        style = "
+        overflow-wrap: anywhere;
+        h1, h2, h3, p{
+          padding-left: 10px;
+          padding-right: 10px;
+        }",
         h3("Display Controls"),
+        br(),
         p("This visualization tool was buit to show how we might 
         expect species to move based on climate model predictions."),
         br(),

@@ -7,7 +7,6 @@
 library(tidyverse)
 library(leaflet)
 library(sf)
-library(gmRi)
 library(rnaturalearth)
 
 # Support Functions:

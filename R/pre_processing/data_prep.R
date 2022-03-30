@@ -7,9 +7,7 @@
 
 ####  Packages  ####
 library(tidyverse)
-# library(leaflet)
 library(sf)
-library(gmRi)
 library(rnaturalearth)
 library(zoo)
 
@@ -22,13 +20,13 @@ source(here::here("R/app_support_functions.R"))
 ####  Paths  ####
 
 
-# Path to shiny app on Box
-sdmShiny_path <- gmRi::cs_path(box_group = "Mills lab", 
-                               subfolder = "Projects/sdm_workflow/targets_output/shiny")
-
-# Path to Res_Data folder on Box
-Res_Data_path <- gmRi::cs_path(box_group = "Res_Data",
-                               subfolder = "Shapefiles/ne_50m_land/")
+# # Path to shiny app on Box
+# sdmShiny_path <- gmRi::cs_path(box_group = "Mills lab", 
+#                                subfolder = "Projects/sdm_workflow/targets_output/shiny")
+# 
+# # Path to Res_Data folder on Box
+# Res_Data_path <- gmRi::cs_path(box_group = "Res_Data",
+#                                subfolder = "Shapefiles/ne_50m_land/")
 
 
 

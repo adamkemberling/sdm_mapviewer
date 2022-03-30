@@ -119,24 +119,23 @@ bSquare <- function(x, a, coords = c("x", "y")) {
 
 
 
-# Get Data that is staged in the cloud based on its folder organization:
-fetch_boxdata <- function(data_resource = NULL){
-  
-  # Path to box where Andrew is putting outputs
-  project_path <- gmRi::cs_path("Mills Lab", 
-                                subfolder = "Projects/sdm_workflow/DFOSDM_app")
-  
-  # Folder for the specific resource
-  resource_folder <- str_c(project_path, data_resource)
-  
-  # List the files and name them
-  resource_files <- list.files(resource_folder, full.names = TRUE) %>% 
-    setNames(list.files(resource_folder, full.names = FALSE))
-  
-  # Return the files
-  return(resource_files)
-  
-}
+# # Get Data that is staged in the cloud based on its folder organization:
+# fetch_boxdata <- function(data_resource = NULL){
+#   
+#   # Path to box where Andrew is putting outputs
+# project_path <- "use gmri"
+#   
+#   # Folder for the specific resource
+#   resource_folder <- str_c(project_path, data_resource)
+#   
+#   # List the files and name them
+#   resource_files <- list.files(resource_folder, full.names = TRUE) %>% 
+#     setNames(list.files(resource_folder, full.names = FALSE))
+#   
+#   # Return the files
+#   return(resource_files)
+#   
+# }
 
 
 

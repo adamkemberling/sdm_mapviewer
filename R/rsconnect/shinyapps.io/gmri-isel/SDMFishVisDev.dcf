@@ -1,0 +1,13 @@
+name: SDMFishVisDev
+title: SDMFishVisDev
+username:
+account: gmri-isel
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5974722
+bundleId: 5746662
+url: https://gmri-isel.shinyapps.io/SDMFishVisDev/
+when: 1648669311.27234
+lastSyncTime: 1648669311.27236
+asMultiple: FALSE
+asStatic: FALSE
